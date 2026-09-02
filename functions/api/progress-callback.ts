@@ -1,5 +1,6 @@
 import { json } from '../_lib/auth'
 import { ambilRun, statusAktif, terapkanLaporan, type Env, type LaporanCallback, type StatusRun } from '../_lib/db'
+import { simpanDaftarPesan, type PesanKirim } from '../_lib/pesan'
 
 interface Laporan {
   runId?: string
@@ -12,6 +13,15 @@ interface Laporan {
   gagal?: number
   tertahan?: number
   alasan?: string
+  pesan?: { wamid?: unknown; nomor?: unknown }[]
+}
+
+/** Ambil cuma entri yang benar-benar punya wamid+nomor -- entri rusak dibuang diam-diam. */
+function pesanSah(daftar: Laporan['pesan']): PesanKirim[] {
+  if (!Array.isArray(daftar)) return []
+  return daftar
+    .filter((p): p is { wamid: string; nomor: string } => typeof p?.wamid === 'string' && typeof p?.nomor === 'string')
+    .map((p) => ({ wamid: p.wamid, nomor: p.nomor }))
 }
 
 /**
@@ -33,6 +43,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const progres = await ambilRun(env, runId)
   if (!progres) return json({ ok: true, catatan: 'run tidak dikenal, dilewati' })
+
+  // Daftar pesan tetap disimpan walau laporan angka telat -- wamid-nya nyata,
+  // cuma laporan kelompok ini yang mendarat setelah run ditutup.
+  const daftarPesan = pesanSah(laporan.pesan)
+  if (daftarPesan.length > 0) await simpanDaftarPesan(env, runId, daftarPesan)
 
   if (!statusAktif(progres.status) && laporan.status === 'jalan') {
     return json({ ok: true, catatan: 'run sudah ditutup, laporan susulan diabaikan' })

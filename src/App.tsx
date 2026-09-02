@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'react'
+import Cangkang, { type Halaman } from './components/Cangkang'
 import Login from './components/Login'
-import Wizard from './components/Wizard'
+import Dashboard from './pages/Dashboard'
+import KirimPromo from './pages/KirimPromo'
 import { api } from './lib/api'
 
 export default function App() {
   const [state, setState] = useState<'loading' | 'out' | 'in'>('loading')
+  // Halaman awal = Dashboard, sesuai permintaan. Perpindahan halaman cukup
+  // state React biasa — tidak perlu react-router buat dua halaman.
+  const [halaman, setHalaman] = useState<Halaman>('dashboard')
 
   useEffect(() => {
     api
@@ -23,25 +28,13 @@ export default function App() {
 
   if (state === 'out') return <Login onSuccess={() => setState('in')} />
 
+  const keluar = () => api.logout().then(() => setState('out'))
+  const sesiHabis = () => setState('out')
+
   return (
-    <div className="min-h-dvh">
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 py-3">
-          <div>
-            <p className="text-sm font-bold leading-tight">Broadcast WhatsApp</p>
-            <p className="text-xs text-slate-500">Kampung Sumber Alam</p>
-          </div>
-          <button
-            onClick={() => api.logout().then(() => setState('out'))}
-            className="text-sm font-medium text-slate-500"
-          >
-            Keluar
-          </button>
-        </div>
-      </header>
-      <main className="mx-auto max-w-2xl px-4 py-6">
-        <Wizard onSesiHabis={() => setState('out')} />
-      </main>
-    </div>
+    <Cangkang halaman={halaman} onNavigate={setHalaman} onLogout={keluar}>
+      {halaman === 'dashboard' && <Dashboard onSesiHabis={sesiHabis} />}
+      {halaman === 'kirim-promo' && <KirimPromo onSesiHabis={sesiHabis} />}
+    </Cangkang>
   )
 }

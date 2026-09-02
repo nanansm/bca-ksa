@@ -87,3 +87,30 @@ export interface ResponPengaturan {
   terpakai_24j: number
   sisa_kuota: number
 }
+
+/** Satu titik grafik harian di dashboard, dari Meta `/{WABA}/analytics`. */
+export interface DashboardHarian {
+  tanggal: string // 'YYYY-MM-DD'
+  terkirim: number
+  sampai: number // delivered
+}
+
+/** Bentuk balasan GET /api/dashboard, lihat docs/KONTRAK-TAHAP-2.md. */
+export interface DashboardApi {
+  ok: true
+  nomor: { display: string; kualitas: string; status: string }
+  hari_ini: { terkirim: number; sisa_kuota: number; batas_harian: number }
+  bulan_ini: {
+    terkirim: number
+    // sampai & dibaca null berarti tabel pesan masih kosong — layar WAJIB tampilkan
+    // "belum ada datanya", bukan angka nol yang menyesatkan.
+    sampai: number | null
+    dibaca: number | null
+    perkiraan_biaya: number
+  }
+  harian: DashboardHarian[]
+  run_terakhir: Progres[]
+  diperbarui: string
+  /** Bagian yang gagal diambil dari Meta ('nomor' / 'harian'). Absen kalau semua beres. */
+  gagal?: string[]
+}

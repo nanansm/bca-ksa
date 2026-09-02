@@ -4,7 +4,7 @@ import { isLoggedIn, json, type Env } from '../_lib/auth'
 const PUBLIC_PATHS = new Set(['/api/login', '/api/logout', '/api/me'])
 
 /** n8n posts progress here; it authenticates with the shared secret header instead. */
-const MACHINE_PATHS = new Set(['/api/progress-callback'])
+const MACHINE_PATHS = new Set(['/api/progress-callback', '/api/status-callback', '/api/tulis-balik'])
 
 // /api/run-aktif dan /api/pengaturan sengaja TIDAK masuk PUBLIC_PATHS atau MACHINE_PATHS —
 // keduanya cuma dibuka lewat sesi login staf, sama seperti /api/promos dan /api/kirim.

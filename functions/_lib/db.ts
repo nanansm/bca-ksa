@@ -215,6 +215,14 @@ export async function terapkanLaporan(env: Env, runId: string, laporan: LaporanC
     .run()
 }
 
+/** Run terbaru, dipakai `run_terakhir` di /api/dashboard. Urut mulai menurun. */
+export async function ambilRunTerakhir(env: Env, limit: number): Promise<Progres[]> {
+  const { results } = await env.DB.prepare(`SELECT ${KOLOM_RUN} FROM run ORDER BY mulai DESC LIMIT ?`)
+    .bind(limit)
+    .all<BarisRun>()
+  return (results ?? []).map(keProgres)
+}
+
 /** Jumlah pesan terkirim dari semua run yang mulai dalam 24 jam terakhir — dasar sisa kuota harian. */
 export async function hitungTerpakai24Jam(env: Env): Promise<number> {
   const batas = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -227,3 +235,16 @@ export async function hitungTerpakai24Jam(env: Env): Promise<number> {
 }
 
 export const statusAktif = (status: StatusRun): boolean => STATUS_AKTIF.has(status)
+
+/**
+ * Jumlah pesan broadcast yang benar-benar terkirim sejak awal bulan Jakarta. Dipakai untuk
+ * perkiraan biaya di dashboard. Sengaja TIDAK memakai angka `sent` dari Meta: angka Meta
+ * mencakup semua percakapan nomor ini termasuk balasan CS, sedangkan yang ditagih sebagai
+ * pesan marketing cuma yang dikirim lewat broadcast.
+ */
+export async function terkirimSejak(env: Env, mulaiIso: string): Promise<number> {
+  const baris = await env.DB.prepare(`SELECT COALESCE(SUM(terkirim), 0) AS n FROM run WHERE mulai >= ?`)
+    .bind(mulaiIso)
+    .first<{ n: number }>()
+  return baris?.n ?? 0
+}

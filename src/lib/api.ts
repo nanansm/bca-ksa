@@ -1,4 +1,5 @@
 import type {
+  DashboardApi,
   HitungResult,
   Maks,
   Progres,
@@ -64,4 +65,5 @@ export const api = {
     }),
   progress: (runId: string) => request<Progres>(`/api/progress?run=${encodeURIComponent(runId)}`),
   runAktif: () => request<{ ok: true; run: Progres | null }>('/api/run-aktif'),
+  dashboard: () => request<DashboardApi>('/api/dashboard'),
 }

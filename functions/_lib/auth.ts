@@ -10,6 +10,11 @@ export interface Env {
   COOKIE_SECRET: string
   N8N_URL: string
   N8N_SECRET: string
+  // Tahap 2: akses Graph API langsung dari _lib/meta.ts (lihat KONTRAK-TAHAP-2.md).
+  // Token SYSTEM_USER, tidak kedaluwarsa. Dilarang menulis nilainya ke repo.
+  META_TOKEN: string
+  META_WABA_ID: string
+  META_PHONE_ID: string
 }
 
 const COOKIE_NAME = 'bcksa_session'
