@@ -30,6 +30,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const progres = JSON.parse(disimpan) as Progres
 
+  // n8n menjalankan cabang laporan dan cabang pencatatan terpisah, jadi laporan
+  // kelompok bisa mendarat setelah laporan akhir. Begitu sebuah run ditutup,
+  // laporan susulan diabaikan supaya angkanya tidak dihitung dua kali.
+  if (progres.status !== 'jalan' && laporan.status !== 'selesai' && laporan.status !== 'dihentikan') {
+    return json({ ok: true, catatan: 'run sudah ditutup, laporan susulan diabaikan' })
+  }
+
   if (laporan.status === 'selesai') {
     progres.status = 'selesai'
     progres.terkirim = Number(laporan.terkirim ?? progres.terkirim)
