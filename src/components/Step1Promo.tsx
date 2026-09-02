@@ -119,9 +119,13 @@ function KartuPromo({
     >
       {promo.gambar_url && (
         <img
-          src={promo.gambar_url}
+          src={promo.gambar_url.replace(/\/([^/]+)$/, '/kecil/$1')}
           alt=""
-          className="h-14 w-14 shrink-0 rounded-lg object-cover"
+          width={56}
+          height={56}
+          loading="lazy"
+          decoding="async"
+          className="h-14 w-14 shrink-0 rounded-lg bg-slate-100 object-cover"
         />
       )}
       <div className="min-w-0 flex-1">
