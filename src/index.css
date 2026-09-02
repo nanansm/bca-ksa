@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+    /* aman untuk iPhone berponi */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* iOS memperbesar layar sendiri kalau font input < 16px */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-brand-400 px-5 text-base font-semibold text-slate-900 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-ghost {
+    @apply inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 transition active:scale-[0.99];
+  }
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white;
+  }
+}
