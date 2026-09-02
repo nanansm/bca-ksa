@@ -53,12 +53,13 @@ async function ambilTercache<T>(env: Env, kunci: string, ambil: () => Promise<T>
   }
 }
 
-async function panggilGraph<T>(env: Env, id: string, fields: string): Promise<T> {
+async function panggilGraph<T>(env: Env, id: string, fields: string, tambahan?: Record<string, string>): Promise<T> {
   if (!env.META_TOKEN) throw new Error('META_TOKEN belum dipasang di Pages')
   if (!id) throw new Error('id Meta kosong (META_WABA_ID / META_PHONE_ID belum dipasang)')
 
   const url = new URL(`https://graph.facebook.com/${VERSI}/${id}`)
   url.searchParams.set('fields', fields)
+  for (const [k, v] of Object.entries(tambahan ?? {})) url.searchParams.set(k, v)
   url.searchParams.set('access_token', env.META_TOKEN)
 
   const res = await fetch(url.toString(), { signal: AbortSignal.timeout(15_000) })
@@ -68,6 +69,115 @@ async function panggilGraph<T>(env: Env, id: string, fields: string): Promise<T>
     throw new Error(`Meta balas ${res.status}: ${badan.slice(0, 200)}`)
   }
   return (await res.json()) as T
+}
+
+interface ErrorGraph {
+  error?: { message?: string; error_user_msg?: string; error_user_title?: string; error_subcode?: number }
+}
+
+/** Error dari POST /message_templates. `pesanStaf` dipilih pemanggil dari `error_user_msg`
+ * Meta (kalimat manusiawi) kalau ada, baru jatuh ke `message` mentah. */
+export class MetaTemplateError extends Error {
+  pesanStaf?: string
+  constructor(message: string, pesanStaf?: string) {
+    super(message)
+    this.pesanStaf = pesanStaf
+  }
+}
+
+/** POST ke Graph API. Jalur terpisah dari panggilGraph (GET) supaya yang GET tidak
+ * ikut berubah -- lihat kontrak: "Bikin jalur POST terpisah, jangan rusak yang GET." */
+async function panggilGraphPost<T>(env: Env, id: string, body: unknown): Promise<T> {
+  if (!env.META_TOKEN) throw new Error('META_TOKEN belum dipasang di Pages')
+  if (!id) throw new Error('id Meta kosong (META_WABA_ID belum dipasang)')
+
+  const url = new URL(`https://graph.facebook.com/${VERSI}/${id}`)
+  url.searchParams.set('access_token', env.META_TOKEN)
+
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
+  })
+
+  const teks = await res.text()
+  let terurai: unknown = null
+  try {
+    terurai = teks ? JSON.parse(teks) : null
+  } catch {
+    // biarkan null -- ditangani lewat status HTTP di bawah
+  }
+
+  if (!res.ok) {
+    const err = (terurai as ErrorGraph | null)?.error
+    throw new MetaTemplateError(err?.message || `Meta balas ${res.status}`, err?.error_user_msg)
+  }
+  return terurai as T
+}
+
+export interface KomponenTombol {
+  type: 'URL' | 'QUICK_REPLY'
+  text: string
+  url?: string
+}
+
+export interface KomponenTemplate {
+  type: 'BODY' | 'FOOTER' | 'BUTTONS'
+  text?: string
+  buttons?: KomponenTombol[]
+}
+
+export interface NamaTemplateMeta {
+  name: string
+  status: string
+}
+
+interface ResponDaftarTemplate {
+  data?: NamaTemplateMeta[]
+}
+
+/**
+ * GET /{WABA}/message_templates?fields=name,status -- dipakai buat cek bentrok nama
+ * dan status terbaru di layar Buat Promo. SENGAJA TIDAK lewat ambilTercache: cache
+ * 10 menit membuat template yang baru saja diajukan staf lain tidak kelihatan bentrok,
+ * dan status yang ditampilkan jadi basi.
+ */
+export async function daftarNamaTemplate(env: Env): Promise<NamaTemplateMeta[]> {
+  // Dicek di sini, bukan cuma di panggilGraph: begitu id disambung jadi
+  // `${id}/message_templates`, string kosong berubah jadi truthy dan lolos penjagaan.
+  if (!env.META_WABA_ID) throw new Error('META_WABA_ID belum dipasang di Pages')
+  const data = await panggilGraph<ResponDaftarTemplate>(
+    env,
+    `${env.META_WABA_ID}/message_templates`,
+    'name,status',
+    { limit: '500' },
+  )
+  return data.data ?? []
+}
+
+export interface HasilBuatTemplate {
+  id: string
+  status: string
+  category: string
+}
+
+/**
+ * POST /{WABA}/message_templates. `language` dan `category` dikunci di sini, bukan
+ * parameter -- kontrak cuma butuh template MARKETING berbahasa Indonesia, mengunci
+ * keduanya mencegah staf lain menambah pilihan yang belum ada validasinya.
+ */
+export async function buatTemplate(
+  env: Env,
+  data: { name: string; components: KomponenTemplate[] },
+): Promise<HasilBuatTemplate> {
+  if (!env.META_WABA_ID) throw new Error('META_WABA_ID belum dipasang di Pages')
+  return panggilGraphPost<HasilBuatTemplate>(env, `${env.META_WABA_ID}/message_templates`, {
+    name: data.name,
+    language: 'id',
+    category: 'MARKETING',
+    components: data.components,
+  })
 }
 
 /** Epoch detik pembulatan hari -- kunci cache stabil sepanjang hari yang sama. */

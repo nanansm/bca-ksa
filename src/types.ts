@@ -3,6 +3,32 @@ export interface Tombol {
   tipe: string
 }
 
+/** Isian layar Buat Promo, bentuk persis body POST /api/promo-baru (lihat KONTRAK-BUAT-PROMO.md). */
+export interface PermintaanPromoBaru {
+  nama: string
+  ringkas: string
+  isi: string
+  footer: string
+  tombol: { tipe: 'situs' | 'balasan'; teks: string; url: string }
+  berlaku_sampai: string
+}
+
+/** Balasan POST /api/promo-baru saat berhasil. */
+export interface ResponPromoBaru {
+  ok: true
+  template: string
+  status: string
+}
+
+/** Satu baris di daftar GET /api/promo-baru -- promo yang tercatat di D1 plus status Meta terbaru. */
+export interface PromoBaruApi {
+  template: string
+  nama: string
+  ringkas: string
+  berlaku_sampai: string | null
+  status: string
+}
+
 /**
  * Bentuk promo dari /api/promos. Server sudah menggabungkan data n8n (isi
  * pesan, tombol, dsb) dengan data katalog di D1 (nama ramah, ringkasan,

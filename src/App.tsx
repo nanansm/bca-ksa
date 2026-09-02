@@ -3,6 +3,7 @@ import Cangkang, { type Halaman } from './components/Cangkang'
 import Login from './components/Login'
 import Dashboard from './pages/Dashboard'
 import KirimPromo from './pages/KirimPromo'
+import BuatPromo from './pages/BuatPromo'
 import { api } from './lib/api'
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
     <Cangkang halaman={halaman} onNavigate={setHalaman} onLogout={keluar}>
       {halaman === 'dashboard' && <Dashboard onSesiHabis={sesiHabis} />}
       {halaman === 'kirim-promo' && <KirimPromo onSesiHabis={sesiHabis} />}
+      {halaman === 'buat-promo' && <BuatPromo onSesiHabis={sesiHabis} />}
     </Cangkang>
   )
 }

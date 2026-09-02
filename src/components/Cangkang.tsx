@@ -1,13 +1,12 @@
 import type { ReactNode } from 'react'
 
 /**
- * Halaman yang punya menu navigasi. Baru dua — Dashboard dan Kirim Promo.
- * Kalau nanti "Buat Promo" / "Daftar Tamu" sudah punya halamannya, tinggal
- * tambah key baru di sini DAN di array MENU di bawah. Sengaja tidak dibuat
- * item menu untuk halaman yang belum ada, biar staf tidak mengetuk sesuatu
- * yang kosong.
+ * Halaman yang punya menu navigasi. Dashboard, Kirim Promo, Buat Promo.
+ * Kalau nanti "Daftar Tamu" sudah punya halamannya, tinggal tambah key baru
+ * di sini DAN di array MENU di bawah. Sengaja tidak dibuat item menu untuk
+ * halaman yang belum ada, biar staf tidak mengetuk sesuatu yang kosong.
  */
-export type Halaman = 'dashboard' | 'kirim-promo'
+export type Halaman = 'dashboard' | 'kirim-promo' | 'buat-promo'
 
 function IkonDashboard({ aktif }: { aktif: boolean }) {
   return (
@@ -45,9 +44,26 @@ function IkonKirim({ aktif }: { aktif: boolean }) {
   )
 }
 
+function IkonBuatPromo({ aktif }: { aktif: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={'h-5 w-5 ' + (aktif ? 'text-[#1a3a2a]' : 'text-slate-400')}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  )
+}
+
 const MENU: { key: Halaman; label: string; ikon: (p: { aktif: boolean }) => ReactNode }[] = [
   { key: 'dashboard', label: 'Dashboard', ikon: IkonDashboard },
   { key: 'kirim-promo', label: 'Kirim Promo', ikon: IkonKirim },
+  { key: 'buat-promo', label: 'Buat Promo', ikon: IkonBuatPromo },
 ]
 
 export default function Cangkang({

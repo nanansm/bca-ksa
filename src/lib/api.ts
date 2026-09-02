@@ -2,10 +2,13 @@ import type {
   DashboardApi,
   HitungResult,
   Maks,
+  PermintaanPromoBaru,
   Progres,
   PromoApi,
+  PromoBaruApi,
   ResponKirim,
   ResponPengaturan,
+  ResponPromoBaru,
 } from '../types'
 
 export class ApiError extends Error {
@@ -66,4 +69,7 @@ export const api = {
   progress: (runId: string) => request<Progres>(`/api/progress?run=${encodeURIComponent(runId)}`),
   runAktif: () => request<{ ok: true; run: Progres | null }>('/api/run-aktif'),
   dashboard: () => request<DashboardApi>('/api/dashboard'),
+  promoBaruList: () => request<{ ok: true; promos: PromoBaruApi[] }>('/api/promo-baru'),
+  promoBaru: (data: PermintaanPromoBaru) =>
+    request<ResponPromoBaru>('/api/promo-baru', { method: 'POST', body: JSON.stringify(data) }),
 }

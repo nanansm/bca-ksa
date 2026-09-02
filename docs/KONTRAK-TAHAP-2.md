@@ -11,7 +11,8 @@ CS ke tamu ikut mengantre. Tahap ini memindahkan event status ke D1.
 
 ## Binding baru di Pages
 
-`META_TOKEN` (secret), `META_WABA_ID` = `1322073749294194`, `META_PHONE_ID` = `744890928718664`.
+`META_TOKEN`, `META_WABA_ID`, `META_PHONE_ID` -- ketiganya bertipe `secret_text`.
+Nilainya ada di dashboard Cloudflare Pages dan di `~/.config/ksa-meta/`, TIDAK di repo ini (repo publik).
 Ketiganya sudah terpasang di production dan preview. Token bertipe SYSTEM_USER, tidak kedaluwarsa.
 DILARANG menulis nilainya ke repo.
 

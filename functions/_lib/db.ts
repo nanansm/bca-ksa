@@ -81,6 +81,33 @@ export async function ambilSemuaPromo(env: Env): Promise<PromoBaris[]> {
   return results ?? []
 }
 
+/** Baris promo urut dari yang paling baru dibuat -- dipakai GET /api/promo-baru supaya
+ * promo yang baru saja diajukan staf muncul paling atas. */
+export async function ambilSemuaPromoTerbaru(env: Env): Promise<PromoBaris[]> {
+  const { results } = await env.DB.prepare(
+    'SELECT template, nama, ringkas, berlaku_sampai, urut FROM promo ORDER BY dibuat DESC',
+  ).all<PromoBaris>()
+  return results ?? []
+}
+
+/**
+ * Menambah satu baris promo baru. WAJIB dipanggil SETELAH Meta menerima templatenya --
+ * lihat KONTRAK-BUAT-PROMO.md: kalau Meta menolak, tabel ini tidak boleh ketambahan
+ * baris yang templatenya tidak ada.
+ */
+export async function tambahPromo(
+  env: Env,
+  data: { template: string; nama: string; ringkas: string; berlakuSampai: string },
+): Promise<void> {
+  const terbesar = await env.DB.prepare('SELECT COALESCE(MAX(urut), 0) AS n FROM promo').first<{ n: number }>()
+  const urut = (terbesar?.n ?? 0) + 1
+  await env.DB.prepare(
+    `INSERT INTO promo (template, nama, ringkas, berlaku_sampai, urut, dibuat) VALUES (?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(data.template, data.nama, data.ringkas, data.berlakuSampai, urut, new Date().toISOString())
+    .run()
+}
+
 /**
  * Mengunci satu run baru sebagai satu-satunya yang aktif. Gagal (indeks unik
  * `run_aktif_tunggal`) berarti sudah ada run lain yang sedang berjalan.
