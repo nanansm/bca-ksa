@@ -2,6 +2,31 @@
 
 Disusun 2 September 2026 untuk Nanan (Moté Kreatif). Klien Kampung Sumber Alam (KSA). Pemakai akhir staf KSA, sebagian dari HP.
 
+
+---
+
+## Koreksi 2 September 2026 — gate persetujuan DIBATALKAN
+
+Rencana di bawah menaruh Nanan sebagai gerbang: staf mengajukan, Nanan menyetujui, baru teks
+masuk ke Meta. Itu salah baca. Yang Nanan maksud dengan "lewat mata dulu baru ke Meta" adalah
+**staf bisa membaca isi pesannya sebelum mengirim**, bukan Nanan menyetujui tiap teks.
+
+Yang berlaku sekarang:
+
+- **Tahap 1 sudah jalan (2 Sep 2026):** kartu promo di Step 1 bisa dibuka, menampilkan preview
+  isi pesan persis seperti yang diterima tamu — gambar, badan pesan, footer, tombol. Memilih
+  promo butuh ketukan kedua di "Pakai promo ini", jadi tidak ada staf yang lanjut tanpa membaca.
+- **Tahap 4 diubah:** teks promo baru langsung diajukan ke Meta tanpa menunggu Nanan. Nanan
+  tetap DIBERI TAHU (WhatsApp + email), tapi pemberitahuan itu tidak menghambat pengajuan.
+  Semua bagian rencana di bawah yang menyebut "Ajukan ke Mote", "menunggu persetujuan", atau
+  tombol Setujui, dibaca sebagai batal.
+
+Pengaman yang menggantikan gate itu ada di form Buat Promo sendiri: preview wajib sebelum
+submit, tombol wajib diisi, `{{1}}` ditolak, kategori dikunci MARKETING, bahasa dikunci
+Indonesian, nama template digenerate otomatis. Review Meta tetap berjalan seperti biasa.
+
+---
+
 ## Enam tahap, dua di antaranya rem keselamatan yang harus jalan sebelum fitur baru
 
 | Urutan | Tahap | Kenapa di posisi ini | Perkiraan kerja Mote |
