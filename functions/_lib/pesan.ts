@@ -57,6 +57,71 @@ export async function simpanDaftarPesan(env: Env, runId: string, pesan: PesanKir
     ).bind(p.wamid, runId, p.nomor, sekarang),
   )
   await env.DB.batch(pernyataan)
+  await serapStatusMenunggu(env, pesan.map((p) => p.wamid))
+}
+
+/**
+ * Ambil status yang sempat tiba sebelum barisnya ada, terapkan, lalu buang.
+ * Tanpa ini status delivered/read hilang permanen untuk hampir semua pesan: webhook Meta
+ * tiba beberapa detik lebih dulu daripada laporan wamid dari n8n.
+ */
+async function serapStatusMenunggu(env: Env, wamids: string[]): Promise<void> {
+  if (wamids.length === 0) return
+  const placeholder = wamids.map(() => '?').join(',')
+  const { results } = await env.DB.prepare(
+    `SELECT wamid, status, billable FROM status_menunggu WHERE wamid IN (${placeholder})`,
+  )
+    .bind(...wamids)
+    .all<{ wamid: string; status: string; billable: number | null }>()
+
+  const menunggu = results ?? []
+  if (menunggu.length === 0) return
+
+  const sekarang = new Date().toISOString()
+  const pernyataan = menunggu.map((m) =>
+    env.DB.prepare(
+      `UPDATE pesan SET status_terakhir = ?, billable = COALESCE(?, billable), diperbarui = ?
+       WHERE wamid = ?`,
+    ).bind(m.status, m.billable, sekarang, m.wamid),
+  )
+  pernyataan.push(
+    env.DB.prepare(`DELETE FROM status_menunggu WHERE wamid IN (${placeholder})`).bind(...wamids),
+  )
+  await env.DB.batch(pernyataan)
+}
+
+/**
+ * Simpan status yang wamid-nya belum dikenal. Tetap tunduk aturan urutan: yang tersimpan
+ * cuma status paling maju. Chat CS biasa ikut mendarat di sini dan tidak pernah diserap
+ * siapa pun, jadi barisnya dibuang setelah dua hari.
+ */
+async function tahanStatusYatim(env: Env, daftar: { wamid: string; status: string; billable: number | null }[]): Promise<void> {
+  if (daftar.length === 0) return
+  const sekarang = new Date().toISOString()
+  const batasBuang = new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString()
+
+  const pernyataan = daftar.map((d) =>
+    env.DB.prepare(
+      `INSERT INTO status_menunggu (wamid, status, billable, waktu) VALUES (?, ?, ?, ?)
+       ON CONFLICT(wamid) DO UPDATE SET
+         status = CASE
+           WHEN status_menunggu.status = 'gagal' THEN status_menunggu.status
+           WHEN excluded.status = 'gagal' THEN excluded.status
+           WHEN ${peringkatSql('excluded.status')} > ${peringkatSql('status_menunggu.status')}
+             THEN excluded.status
+           ELSE status_menunggu.status
+         END,
+         billable = COALESCE(excluded.billable, status_menunggu.billable),
+         waktu = excluded.waktu`,
+    ).bind(d.wamid, d.status, d.billable, sekarang),
+  )
+  pernyataan.push(env.DB.prepare(`DELETE FROM status_menunggu WHERE waktu < ?`).bind(batasBuang))
+  await env.DB.batch(pernyataan)
+}
+
+/** Urutan status sebagai angka, dipakai di dalam SQL supaya aturannya cuma ditulis sekali. */
+function peringkatSql(kolom: string): string {
+  return `(CASE ${kolom} WHEN 'dibaca' THEN 3 WHEN 'sampai' THEN 2 WHEN 'terkirim' THEN 1 ELSE 0 END)`
 }
 
 /**
@@ -83,16 +148,23 @@ export async function terapkanStatusMeta(
   const tersimpan = new Map((results ?? []).map((r) => [r.wamid, r.status_terakhir]))
   const sekarang = new Date().toISOString()
   const pernyataan = []
+  const yatim: { wamid: string; status: string; billable: number | null }[] = []
 
   for (const s of valid) {
+    const billable = s.pricing?.billable === undefined ? null : s.pricing.billable ? 1 : 0
     const statusLama = tersimpan.get(s.id)
-    if (statusLama === undefined) continue // wamid tak dikenal -- dilewati diam-diam, chat CS biasa juga lewat sini
+    if (statusLama === undefined) {
+      // Belum tentu asing: bisa jadi barisnya memang belum sempat ditulis n8n. Ditahan
+      // dulu, diserap nanti oleh simpanDaftarPesan. Chat CS yang nyasar ke sini terbuang
+      // sendiri lewat pembersihan dua hari.
+      yatim.push({ wamid: s.id, status: PETA_STATUS[s.status], billable: billable })
+      continue
+    }
 
     const statusBaru = PETA_STATUS[s.status]
     const maju = statusLama !== 'gagal' && (statusBaru === 'gagal' || (URUTAN[statusBaru] ?? 0) > (URUTAN[statusLama] ?? 0))
     if (!maju) continue
 
-    const billable = s.pricing?.billable === undefined ? null : s.pricing.billable ? 1 : 0
     pernyataan.push(
       // COALESCE: cuma event 'delivered' yang membawa `pricing`. Tanpa ini, event 'read'
       // yang datang sesudahnya akan menghapus penanda billable yang sudah tersimpan.
@@ -108,6 +180,7 @@ export async function terapkanStatusMeta(
   }
 
   if (pernyataan.length > 0) await env.DB.batch(pernyataan)
+  await tahanStatusYatim(env, yatim)
 
   const dikenal = tersimpan.size
   const dilewati = statuses.length - dikenal
