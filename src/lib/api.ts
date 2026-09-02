@@ -1,3 +1,5 @@
+import type { HitungResult, KirimResult, Maks, PromoApi } from '../types'
+
 export class ApiError extends Error {
   status: number
   constructor(message: string, status: number) {
@@ -33,4 +35,17 @@ export const api = {
   login: (user: string, pass: string) =>
     request<{ ok: true }>('/api/login', { method: 'POST', body: JSON.stringify({ user, pass }) }),
   logout: () => request<{ ok: true }>('/api/logout', { method: 'POST' }),
+  promos: () => request<{ ok: true; promos: PromoApi[] }>('/api/promos'),
+  hitung: (template: string, label: string, maks: Maks) =>
+    request<HitungResult>('/api/hitung', {
+      method: 'POST',
+      body: JSON.stringify({ template, label, maks }),
+    }),
+  kirim: (template: string, label: string, maks: Maks) =>
+    request<KirimResult>('/api/kirim', {
+      method: 'POST',
+      body: JSON.stringify({ template, label, maks, konfirmasi: true }),
+    }),
+  progress: (runId: string) =>
+    request<KirimResult>(`/api/progress?run=${encodeURIComponent(runId)}`),
 }

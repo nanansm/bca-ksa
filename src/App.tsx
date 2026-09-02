@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Login from './components/Login'
+import Wizard from './components/Wizard'
 import { api } from './lib/api'
 
 export default function App() {
@@ -39,9 +40,7 @@ export default function App() {
         </div>
       </header>
       <main className="mx-auto max-w-2xl px-4 py-6">
-        <div className="card p-5">
-          <p className="text-sm text-slate-600">Sedang disiapkan.</p>
-        </div>
+        <Wizard onSesiHabis={() => setState('out')} />
       </main>
     </div>
   )
