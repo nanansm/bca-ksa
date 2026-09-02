@@ -1,21 +1,24 @@
 import { useState } from 'react'
 import HoldButton from './HoldButton'
-import type { HitungResult, Maks, PromoView } from '../types'
+import type { HitungResult, Maks, PromoApi } from '../types'
 
-const angka = (n: number) => n.toLocaleString('id-ID')
+const angka = (n: number) => new Intl.NumberFormat('id-ID').format(n)
 
 export default function Step4Kirim({
   promo,
   maks,
   hasil,
+  tarifPerPesan,
   onKonfirmasi,
   onBack,
   busy,
   error,
 }: {
-  promo: PromoView
+  promo: PromoApi
   maks: Maks
   hasil: HitungResult
+  /** Tarif per pesan dari /api/pengaturan. `null` kalau gagal dimuat. */
+  tarifPerPesan: number | null
   onKonfirmasi: () => void
   onBack: () => void
   busy: boolean
@@ -23,8 +26,17 @@ export default function Step4Kirim({
 }) {
   const semuaTamu = maks === 0
   const modeUji = maks === -1
-  const [sudahYakin, setSudahYakin] = useState(false)
-  const perluTombolTahan = !semuaTamu || sudahYakin
+  const biaya = !modeUji && tarifPerPesan !== null ? hasil.akan_dikirim * tarifPerPesan : null
+  // Dibulatkan ke bawah — staf ketik angka juta yang tertulis jelas di layar
+  // sebagai bukti sudah membaca perkiraan biayanya sebelum kirim ke semua tamu.
+  const biayaJuta = biaya !== null ? Math.floor(biaya / 1_000_000) : null
+
+  const [sudahYakin, setSudahYakin] = useState(false) // dipakai kalau biaya tidak diketahui
+  const [inputJuta, setInputJuta] = useState('')
+
+  const perluKonfirmasiAngka = semuaTamu && biayaJuta !== null
+  const konfirmasiAngkaCocok = perluKonfirmasiAngka && inputJuta.trim() === String(biayaJuta)
+  const perluTombolTahan = !semuaTamu || (perluKonfirmasiAngka ? konfirmasiAngkaCocok : sudahYakin)
 
   return (
     <div>
@@ -45,6 +57,11 @@ export default function Step4Kirim({
             Ini percobaan. Tidak ada tamu yang menerima pesannya.
           </p>
         )}
+        {biaya !== null && (
+          <p className="mt-2 text-sm text-slate-500">
+            Perkiraan biaya sekitar <span className="font-semibold text-slate-700">Rp {angka(biaya)}</span>.
+          </p>
+        )}
       </div>
 
       {error && (
@@ -53,14 +70,31 @@ export default function Step4Kirim({
         </div>
       )}
 
-      {semuaTamu && !sudahYakin && (
+      {semuaTamu && !perluTombolTahan && (
         <div className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4">
           <p className="mb-3 text-sm font-semibold text-amber-800">
             Ini akan mengirim ke SEMUA tamu, bukan sebagian. Pastikan sudah benar sebelum lanjut.
           </p>
-          <button onClick={() => setSudahYakin(true)} className="btn-ghost w-full bg-white">
-            Saya yakin, kirim ke semua tamu
-          </button>
+
+          {perluKonfirmasiAngka ? (
+            <>
+              <p className="mb-2 text-sm text-amber-800">
+                Perkiraan biaya sekitar Rp {angka(biaya as number)}. Untuk konfirmasi, ketik angka
+                jutanya di kotak ini: <span className="font-bold">{biayaJuta}</span>
+              </p>
+              <input
+                inputMode="numeric"
+                value={inputJuta}
+                onChange={(e) => setInputJuta(e.target.value)}
+                placeholder="Ketik angka juta"
+                className="w-full rounded-xl border border-amber-300 bg-white px-4 py-3 text-center text-lg font-bold text-slate-900 outline-none focus:border-[#1a3a2a]"
+              />
+            </>
+          ) : (
+            <button onClick={() => setSudahYakin(true)} className="btn-ghost w-full bg-white">
+              Saya yakin, kirim ke semua tamu
+            </button>
+          )}
         </div>
       )}
 

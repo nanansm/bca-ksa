@@ -1,31 +1,28 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '../lib/api'
-import { entriKatalog } from '../lib/katalog'
-import type { PromoView } from '../types'
+import type { PromoApi } from '../types'
 
 type Muatan =
   | { status: 'memuat' }
   | { status: 'gagal'; pesan: string }
-  | { status: 'siap'; data: PromoView[] }
+  | { status: 'siap'; data: PromoApi[] }
 
 export default function Step1Promo({
   onPilih,
   onSesiHabis,
 }: {
-  onPilih: (promo: PromoView) => void
+  onPilih: (promo: PromoApi) => void
   onSesiHabis: () => void
 }) {
   const [muatan, setMuatan] = useState<Muatan>({ status: 'memuat' })
-  const [buka, setBuka] = useState(false)
 
   function muat() {
     setMuatan({ status: 'memuat' })
     api
       .promos()
       .then((r) => {
-        const gabung: PromoView[] = r.promos.map((p) => ({ ...p, ...entriKatalog(p.template) }))
-        gabung.sort((a, b) => a.urut - b.urut)
-        setMuatan({ status: 'siap', data: gabung })
+        const diurutkan = [...r.promos].sort((a, b) => a.urut - b.urut)
+        setMuatan({ status: 'siap', data: diurutkan })
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) return onSesiHabis()
@@ -58,13 +55,15 @@ export default function Step1Promo({
     )
   }
 
-  const siap = muatan.data.filter((p) => !p.kedaluwarsa && p.bisa_dikirim)
-  const lama = muatan.data.filter((p) => p.kedaluwarsa || !p.bisa_dikirim)
-
-  if (siap.length === 0 && lama.length === 0) {
+  // Server hanya mengirim promo yang statusnya disetujui Meta, tercatat di
+  // katalog, dan belum kedaluwarsa — jadi daftar ini sudah "siap tayang".
+  if (muatan.data.length === 0) {
     return (
-      <div className="card p-5 text-center">
-        <p className="text-sm text-slate-600">Belum ada promo yang bisa ditampilkan.</p>
+      <div className="card space-y-2 p-5 text-center">
+        <p className="text-sm font-semibold text-slate-700">Tidak ada promo berlaku saat ini.</p>
+        <p className="text-sm text-slate-500">
+          Hubungi tim Moté dulu untuk membuat promo baru sebelum bisa mengirim broadcast.
+        </p>
       </div>
     )
   }
@@ -75,24 +74,10 @@ export default function Step1Promo({
       <p className="mb-4 text-sm text-slate-500">Ketuk salah satu kartu di bawah.</p>
 
       <div className="space-y-3">
-        {siap.map((p) => (
+        {muatan.data.map((p) => (
           <KartuPromo key={p.template} promo={p} onPilih={onPilih} />
         ))}
       </div>
-
-      {lama.length > 0 && !buka && (
-        <button onClick={() => setBuka(true)} className="btn-ghost mt-4 w-full">
-          Tampilkan promo lama ({lama.length})
-        </button>
-      )}
-
-      {buka && (
-        <div className="mt-4 space-y-3">
-          {lama.map((p) => (
-            <KartuPromo key={p.template} promo={p} onPilih={onPilih} />
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -101,10 +86,9 @@ function KartuPromo({
   promo,
   onPilih,
 }: {
-  promo: PromoView
-  onPilih: (promo: PromoView) => void
+  promo: PromoApi
+  onPilih: (promo: PromoApi) => void
 }) {
-  const siapKirim = !promo.kedaluwarsa && promo.bisa_dikirim
   const bisaDiklik = promo.bisa_dikirim
 
   return (
@@ -131,14 +115,9 @@ function KartuPromo({
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex flex-wrap items-center gap-1.5">
           <span className="truncate text-sm font-bold text-slate-900">{promo.nama}</span>
-          {siapKirim && (
+          {bisaDiklik && (
             <span className="shrink-0 rounded-full bg-[#96CD50]/25 px-2 py-0.5 text-[11px] font-semibold text-[#1a3a2a]">
               Siap kirim
-            </span>
-          )}
-          {!siapKirim && promo.kedaluwarsa && (
-            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">
-              {promo.kedaluwarsa}
             </span>
           )}
         </div>

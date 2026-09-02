@@ -3,7 +3,12 @@ export interface Tombol {
   tipe: string
 }
 
-/** Bentuk mentah satu promo dari /api/promos. */
+/**
+ * Bentuk promo dari /api/promos. Server sudah menggabungkan data n8n (isi
+ * pesan, tombol, dsb) dengan data katalog di D1 (nama ramah, ringkasan,
+ * urutan tampil, tanggal berlaku). Layar tidak lagi punya katalog sendiri —
+ * promo yang tidak lolos saring server memang tidak pernah dikirim ke sini.
+ */
 export interface PromoApi {
   template: string
   status: string
@@ -14,14 +19,10 @@ export interface PromoApi {
   tombol: Tombol[]
   bisa_dikirim: boolean
   alasan_tak_bisa: string
-}
-
-/** Promo API digabung dengan data katalog (nama ramah, ringkasan, urutan). */
-export interface PromoView extends PromoApi {
   nama: string
   ringkas: string
-  kedaluwarsa?: string
   urut: number
+  berlaku_sampai: string | null
 }
 
 export interface DibuangRincian {
@@ -49,24 +50,40 @@ export interface HitungResult {
   dibuang: DibuangRincian
 }
 
-export type StatusKirim = 'jalan' | 'selesai' | 'dihentikan'
-
-export interface KirimResult {
-  ok: true
-  runId: string
-  status: StatusKirim
-  promo: string
-  target: number
-  terkirim: number
-  gagal: number
-  mulai: string
-  diperbarui: string
-}
-
 /** Nilai `maks` yang sah: -1 uji ke nomor Mote, 0 semua tamu. */
 export type Maks = -1 | 25 | 200 | 1000 | 0
 
-export interface PilihanKirim {
-  promo: PromoView
-  maks: Maks
+export type StatusRun =
+  | 'menyiapkan' // sudah dikunci, n8n belum melapor
+  | 'jalan'
+  | 'selesai'
+  | 'dihentikan' // rem darurat gagal beruntun
+  | 'dihentikan_batas' // kena batas harian Meta
+  | 'terputus' // tidak ada kabar > 15 menit
+  | 'gagal_mulai' // n8n menolak setelah balasan dini
+
+export interface Progres {
+  runId: string
+  status: StatusRun
+  promo: string
+  target: number // 0 selama masih 'menyiapkan'
+  terkirim: number
+  gagal: number
+  tertahan: number // kena batas Meta, tamu TIDAK dianggap sudah dikirimi
+  alasan: string // kosong kalau normal
+  mulai: string // ISO
+  diperbarui: string // ISO
+}
+
+/** Balasan POST /api/kirim: progres awal, plus info kalau kuota harian memotong jumlah yang diminta. */
+export interface ResponKirim extends Progres {
+  dipotong?: { diminta: number; dikirim: number }
+}
+
+export interface ResponPengaturan {
+  ok: true
+  tarif_per_pesan: number
+  batas_harian: number
+  terpakai_24j: number
+  sisa_kuota: number
 }

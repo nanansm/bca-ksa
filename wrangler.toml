@@ -1,0 +1,12 @@
+name = "bc-ksa"
+pages_build_output_dir = "dist"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "bc-ksa"
+database_id = "82330bd1-e34e-461f-9017-341f694a7679"
+
+[[kv_namespaces]]
+binding = "BC_STATE"
+id = "e0faea48f2b047f3b225776fd9fe8c6f"

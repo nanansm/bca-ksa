@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { api, ApiError } from '../lib/api'
-import type { HitungResult, Maks, PromoView } from '../types'
+import type { HitungResult, Maks, PromoApi, ResponPengaturan } from '../types'
+
+const angka = (n: number) => new Intl.NumberFormat('id-ID').format(n)
 
 const PILIHAN: { maks: Maks; label: string; keterangan: string }[] = [
   { maks: -1, label: 'Uji dulu', keterangan: '1 pesan ke nomor Mote, tidak ada tamu yang menerima' },
@@ -12,11 +14,14 @@ const PILIHAN: { maks: Maks; label: string; keterangan: string }[] = [
 
 export default function Step2Jumlah({
   promo,
+  pengaturan,
   onHitung,
   onBack,
   onSesiHabis,
 }: {
-  promo: PromoView
+  promo: PromoApi
+  /** Perkiraan tarif & sisa kuota dari /api/pengaturan. `null` kalau gagal dimuat. */
+  pengaturan: ResponPengaturan | null
   onHitung: (hasil: HitungResult, maks: Maks) => void
   onBack: () => void
   onSesiHabis: () => void
@@ -44,9 +49,16 @@ export default function Step2Jumlah({
       </button>
 
       <h1 className="mb-1 text-lg font-bold text-slate-900">Kirim ke berapa tamu?</h1>
-      <p className="mb-4 text-sm text-slate-500">
+      <p className="mb-1 text-sm text-slate-500">
         Promo: <span className="font-semibold text-slate-700">{promo.nama}</span>
       </p>
+      {pengaturan && (
+        <p className="mb-4 text-xs text-slate-500">
+          Sisa kuota nomor hari ini:{' '}
+          <span className="font-semibold text-slate-700">{angka(pengaturan.sisa_kuota)}</span>
+        </p>
+      )}
+      {!pengaturan && <div className="mb-4" />}
 
       {menghitung !== null && (
         <div className="card mb-4 flex flex-col items-center gap-3 p-6 text-center">
@@ -65,20 +77,47 @@ export default function Step2Jumlah({
 
       {menghitung === null && (
         <div className="space-y-3">
-          {PILIHAN.map((p, i) => (
-            <button
-              key={p.maks}
-              onClick={() => pilih(p.maks)}
-              className={
-                i === 0
-                  ? 'card w-full min-h-[52px] border-2 border-[#1a3a2a] bg-[#1a3a2a]/5 p-4 text-left active:scale-[0.99]'
-                  : 'card w-full min-h-[52px] p-4 text-left active:scale-[0.99]'
+          {PILIHAN.map((p, i) => {
+            // Perkiraan rupiah cuma bisa dihitung kalau tarif sudah dimuat, dan
+            // tidak ditampilkan untuk mode uji (tidak ada tamu yang dikirimi).
+            let rupiahTeks = ''
+            let potongTeks = ''
+            if (p.maks !== -1 && pengaturan) {
+              const tarif = pengaturan.tarif_per_pesan
+              const sisaKuota = pengaturan.sisa_kuota
+              if (p.maks === 0) {
+                rupiahTeks = `Perkiraan hingga Rp ${angka(sisaKuota * tarif)}`
+                potongTeks =
+                  'Kalau tamu yang lolos lebih banyak dari sisa kuota, kiriman dipotong otomatis dan sisanya bisa dikirim besok.'
+              } else {
+                const kenaPotong = p.maks > sisaKuota
+                const efektif = kenaPotong ? sisaKuota : p.maks
+                rupiahTeks = `Perkiraan Rp ${angka(efektif * tarif)}`
+                if (kenaPotong) {
+                  potongTeks = `Sisa kuota hari ini cuma ${angka(sisaKuota)}, jumlahnya akan dipotong dan sisanya bisa dikirim besok.`
+                }
               }
-            >
-              <p className="text-base font-bold text-slate-900">{p.label}</p>
-              <p className="text-xs text-slate-500">{p.keterangan}</p>
-            </button>
-          ))}
+            }
+
+            return (
+              <button
+                key={p.maks}
+                onClick={() => pilih(p.maks)}
+                className={
+                  i === 0
+                    ? 'card w-full min-h-[52px] border-2 border-[#1a3a2a] bg-[#1a3a2a]/5 p-4 text-left active:scale-[0.99]'
+                    : 'card w-full min-h-[52px] p-4 text-left active:scale-[0.99]'
+                }
+              >
+                <p className="text-base font-bold text-slate-900">{p.label}</p>
+                <p className="text-xs text-slate-500">{p.keterangan}</p>
+                {rupiahTeks && (
+                  <p className="mt-1 text-xs font-semibold text-[#1a3a2a]">{rupiahTeks}</p>
+                )}
+                {potongTeks && <p className="mt-1 text-xs text-amber-600">{potongTeks}</p>}
+              </button>
+            )
+          })}
         </div>
       )}
     </div>

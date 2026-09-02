@@ -1,5 +1,5 @@
 import WhatsappBubble from './WhatsappBubble'
-import type { DibuangRincian, HitungResult, Maks, PromoView } from '../types'
+import type { DibuangRincian, HitungResult, Maks, PromoApi } from '../types'
 
 const LABEL_DIBUANG: { kunci: keyof DibuangRincian; teks: string }[] = [
   { kunci: 'sudah_optout', teks: 'sudah minta berhenti' },
@@ -11,23 +11,27 @@ const LABEL_DIBUANG: { kunci: keyof DibuangRincian; teks: string }[] = [
   { kunci: 'duplikat', teks: 'nomor kembar' },
 ]
 
-const angka = (n: number) => n.toLocaleString('id-ID')
+const angka = (n: number) => new Intl.NumberFormat('id-ID').format(n)
 
 export default function Step3Pratinjau({
   promo,
   hasil,
   maks,
+  tarifPerPesan,
   onLanjut,
   onBack,
 }: {
-  promo: PromoView
+  promo: PromoApi
   hasil: HitungResult
   maks: Maks
+  /** Tarif per pesan dari /api/pengaturan. `null` kalau gagal dimuat — baris biaya disembunyikan. */
+  tarifPerPesan: number | null
   onLanjut: () => void
   onBack: () => void
 }) {
   const modeUji = maks === -1
   const rincianDibuang = LABEL_DIBUANG.filter((l) => hasil.dibuang[l.kunci] > 0)
+  const biaya = !modeUji && tarifPerPesan !== null ? hasil.akan_dikirim * tarifPerPesan : null
 
   return (
     <div>
@@ -64,6 +68,14 @@ export default function Step3Pratinjau({
           <p className="text-sm text-slate-600">
             <span className="text-xl font-bold text-slate-900">{angka(hasil.akan_dikirim)}</span>{' '}
             dari {angka(hasil.total_audience)} tamu akan menerima pesan ini.
+          </p>
+        )}
+
+        {biaya !== null && (
+          <p className="mt-2 text-sm text-slate-600">
+            Perkiraan biaya sekitar{' '}
+            <span className="font-bold text-slate-900">Rp {angka(biaya)}</span> untuk{' '}
+            {angka(hasil.akan_dikirim)} tamu.
           </p>
         )}
 

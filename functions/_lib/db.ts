@@ -1,0 +1,229 @@
+import type { Env as EnvDasar } from './auth'
+
+/**
+ * Pembungkus tipis di atas D1. Semua endpoint bicara lewat fungsi di sini supaya
+ * bentuk baris tabel tidak bocor ke mana-mana — kalau skema berubah, cukup file ini.
+ */
+export interface Env extends EnvDasar {
+  DB: D1Database
+}
+
+export type StatusRun =
+  | 'menyiapkan' // sudah dikunci, n8n belum melapor
+  | 'jalan'
+  | 'selesai'
+  | 'dihentikan' // rem darurat gagal beruntun
+  | 'dihentikan_batas' // kena batas harian Meta
+  | 'terputus' // tidak ada kabar > 15 menit
+  | 'gagal_mulai' // n8n menolak setelah balasan dini
+
+export interface Progres {
+  runId: string
+  status: StatusRun
+  promo: string
+  target: number // 0 selama masih 'menyiapkan'
+  terkirim: number
+  gagal: number
+  tertahan: number // kena batas Meta, tamu TIDAK dianggap sudah dikirimi
+  alasan: string // kosong kalau normal
+  mulai: string // ISO
+  diperbarui: string // ISO
+}
+
+/** Status yang menandakan run masih memegang kunci (kolom `aktif` = 1). */
+const STATUS_AKTIF = new Set<StatusRun>(['menyiapkan', 'jalan'])
+
+const LIMBO_MS = 15 * 60 * 1000
+
+interface BarisRun {
+  id: string
+  status: StatusRun
+  promo: string
+  target: number
+  terkirim: number
+  gagal: number
+  tertahan: number
+  alasan: string
+  mulai: string
+  diperbarui: string
+}
+
+function keProgres(baris: BarisRun): Progres {
+  return {
+    runId: baris.id,
+    status: baris.status,
+    promo: baris.promo,
+    target: baris.target,
+    terkirim: baris.terkirim,
+    gagal: baris.gagal,
+    tertahan: baris.tertahan,
+    alasan: baris.alasan,
+    mulai: baris.mulai,
+    diperbarui: baris.diperbarui,
+  }
+}
+
+const KOLOM_RUN = 'id, status, promo, target, terkirim, gagal, tertahan, alasan, mulai, diperbarui'
+
+export interface PromoBaris {
+  template: string
+  nama: string
+  ringkas: string
+  berlaku_sampai: string | null
+  urut: number
+}
+
+/** Seluruh baris tabel promo, dipakai untuk menggabung dengan jawaban n8n. */
+export async function ambilSemuaPromo(env: Env): Promise<PromoBaris[]> {
+  const { results } = await env.DB.prepare(
+    'SELECT template, nama, ringkas, berlaku_sampai, urut FROM promo',
+  ).all<PromoBaris>()
+  return results ?? []
+}
+
+/**
+ * Mengunci satu run baru sebagai satu-satunya yang aktif. Gagal (indeks unik
+ * `run_aktif_tunggal`) berarti sudah ada run lain yang sedang berjalan.
+ */
+export async function kunciRunBaru(
+  env: Env,
+  data: { id: string; promo: string; template: string; maks: number },
+): Promise<{ ok: true } | { ok: false; aktif: Progres | null }> {
+  const sekarang = new Date().toISOString()
+  try {
+    await env.DB.prepare(
+      `INSERT INTO run (id, status, promo, template, maks, target, terkirim, gagal, tertahan, alasan, mulai, diperbarui, aktif)
+       VALUES (?, 'menyiapkan', ?, ?, ?, 0, 0, 0, 0, '', ?, ?, 1)`,
+    )
+      .bind(data.id, data.promo, data.template, data.maks, sekarang, sekarang)
+      .run()
+    return { ok: true }
+  } catch {
+    // Indeks unik menolak baris kedua yang aktif — beri tahu pemanggil run mana yang sedang jalan.
+    return { ok: false, aktif: await ambilRunAktif(env) }
+  }
+}
+
+/**
+ * Dipanggil setelah n8n menjawab OK. Dua penjaga di sini penting:
+ *
+ * 1. `WHERE status = 'menyiapkan'` — n8n membalas lebih dulu lalu terus bekerja, jadi run
+ *    pendek (mode uji, satu penerima) bisa sudah dilaporkan 'selesai' sebelum baris ini
+ *    dijalankan. Tanpa penjaga ini run yang sudah tutup dihidupkan lagi jadi 'jalan' dan
+ *    kuncinya nyangkut 15 menit.
+ * 2. Target hanya ditimpa kalau angkanya sungguhan. Balasan dini n8n membawa target 0,
+ *    sedangkan angka aslinya menyusul lewat laporan `Lapor Target`, yang bisa mendarat
+ *    lebih dulu.
+ */
+export async function tandaiJalan(env: Env, runId: string, target: number): Promise<void> {
+  const sekarang = new Date().toISOString()
+  if (target > 0) {
+    await env.DB.prepare(
+      `UPDATE run SET status = 'jalan', target = ?, aktif = 1, diperbarui = ?
+       WHERE id = ? AND status = 'menyiapkan'`,
+    )
+      .bind(target, sekarang, runId)
+      .run()
+    return
+  }
+  await env.DB.prepare(
+    `UPDATE run SET status = 'jalan', aktif = 1, diperbarui = ?
+     WHERE id = ? AND status = 'menyiapkan'`,
+  )
+    .bind(sekarang, runId)
+    .run()
+}
+
+/** Dipanggil saat panggilan n8n gagal: kunci dilepas supaya staf bisa coba lagi. */
+export async function tandaiGagalMulai(env: Env, runId: string, alasan: string): Promise<void> {
+  await env.DB.prepare(
+    `UPDATE run SET status = 'gagal_mulai', alasan = ?, aktif = NULL, diperbarui = ? WHERE id = ?`,
+  )
+    .bind(alasan, new Date().toISOString(), runId)
+    .run()
+}
+
+export async function ambilRun(env: Env, runId: string): Promise<Progres | null> {
+  const baris = await env.DB.prepare(`SELECT ${KOLOM_RUN} FROM run WHERE id = ?`)
+    .bind(runId)
+    .first<BarisRun>()
+  return baris ? keProgres(baris) : null
+}
+
+/** Run yang sedang memegang kunci (status 'menyiapkan' atau 'jalan'), kalau ada. */
+export async function ambilRunAktif(env: Env): Promise<Progres | null> {
+  const baris = await env.DB.prepare(`SELECT ${KOLOM_RUN} FROM run WHERE aktif = 1 LIMIT 1`).first<BarisRun>()
+  return baris ? keProgres(baris) : null
+}
+
+/**
+ * Menutup run yang tidak ada kabar > 15 menit sebagai 'terputus'. Dipanggil di awal
+ * GET /api/run-aktif supaya kunci tidak nyangkut selamanya kalau n8n mati di tengah jalan.
+ */
+export async function tandaiTerputusJikaBasi(env: Env): Promise<void> {
+  const batas = new Date(Date.now() - LIMBO_MS).toISOString()
+  await env.DB.prepare(
+    `UPDATE run SET status = 'terputus', aktif = NULL, diperbarui = ?
+     WHERE aktif = 1 AND diperbarui < ?`,
+  )
+    .bind(new Date().toISOString(), batas)
+    .run()
+}
+
+export type LaporanCallback =
+  | { status: 'jalan'; terkirimBatch: number; gagalBatch: number; tertahanBatch: number; target?: number }
+  | { status: 'selesai'; terkirim: number; gagal: number; tertahan: number }
+  | { status: 'dihentikan' | 'dihentikan_batas' | 'gagal_mulai'; alasan: string }
+
+/**
+ * Menerapkan satu laporan dari n8n ke baris run. Status penutup ('selesai',
+ * 'dihentikan', 'dihentikan_batas', 'gagal_mulai') melepas kunci (`aktif = NULL`).
+ */
+export async function terapkanLaporan(env: Env, runId: string, laporan: LaporanCallback): Promise<void> {
+  const sekarang = new Date().toISOString()
+
+  if (laporan.status === 'jalan') {
+    if (typeof laporan.target === 'number') {
+      await env.DB.prepare(
+        `UPDATE run SET terkirim = terkirim + ?, gagal = gagal + ?, tertahan = tertahan + ?, target = ?, diperbarui = ? WHERE id = ?`,
+      )
+        .bind(laporan.terkirimBatch, laporan.gagalBatch, laporan.tertahanBatch, laporan.target, sekarang, runId)
+        .run()
+    } else {
+      await env.DB.prepare(
+        `UPDATE run SET terkirim = terkirim + ?, gagal = gagal + ?, tertahan = tertahan + ?, diperbarui = ? WHERE id = ?`,
+      )
+        .bind(laporan.terkirimBatch, laporan.gagalBatch, laporan.tertahanBatch, sekarang, runId)
+        .run()
+    }
+    return
+  }
+
+  if (laporan.status === 'selesai') {
+    await env.DB.prepare(
+      `UPDATE run SET status = 'selesai', terkirim = ?, gagal = ?, tertahan = ?, aktif = NULL, diperbarui = ? WHERE id = ?`,
+    )
+      .bind(laporan.terkirim, laporan.gagal, laporan.tertahan, sekarang, runId)
+      .run()
+    return
+  }
+
+  await env.DB.prepare(
+    `UPDATE run SET status = ?, alasan = ?, aktif = NULL, diperbarui = ? WHERE id = ?`,
+  )
+    .bind(laporan.status, laporan.alasan, sekarang, runId)
+    .run()
+}
+
+/** Jumlah pesan terkirim dari semua run yang mulai dalam 24 jam terakhir — dasar sisa kuota harian. */
+export async function hitungTerpakai24Jam(env: Env): Promise<number> {
+  const batas = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const baris = await env.DB.prepare(
+    `SELECT COALESCE(SUM(terkirim), 0) AS total FROM run WHERE mulai >= ?`,
+  )
+    .bind(batas)
+    .first<{ total: number }>()
+  return baris?.total ?? 0
+}
+
+export const statusAktif = (status: StatusRun): boolean => STATUS_AKTIF.has(status)
