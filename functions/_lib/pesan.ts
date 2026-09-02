@@ -94,7 +94,11 @@ export async function terapkanStatusMeta(
 
     const billable = s.pricing?.billable === undefined ? null : s.pricing.billable ? 1 : 0
     pernyataan.push(
-      env.DB.prepare(`UPDATE pesan SET status_terakhir = ?, billable = ?, diperbarui = ? WHERE wamid = ?`).bind(
+      // COALESCE: cuma event 'delivered' yang membawa `pricing`. Tanpa ini, event 'read'
+      // yang datang sesudahnya akan menghapus penanda billable yang sudah tersimpan.
+      env.DB.prepare(
+        `UPDATE pesan SET status_terakhir = ?, billable = COALESCE(?, billable), diperbarui = ? WHERE wamid = ?`,
+      ).bind(
         statusBaru,
         billable,
         sekarang,
