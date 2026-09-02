@@ -106,7 +106,9 @@ export interface DashboardApi {
     // "belum ada datanya", bukan angka nol yang menyesatkan.
     sampai: number | null
     dibaca: number | null
-    perkiraan_biaya: number
+    /** Rupiah. Tagihan Meta sebenarnya kalau `biaya_asli` true, kalau tidak hitungan tarif x jumlah. */
+    biaya: number
+    biaya_asli: boolean
   }
   harian: DashboardHarian[]
   run_terakhir: Progres[]

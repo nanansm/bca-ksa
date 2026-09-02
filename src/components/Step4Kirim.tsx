@@ -1,6 +1,18 @@
 import { useState } from 'react'
 import HoldButton from './HoldButton'
-import type { HitungResult, Maks, PromoApi } from '../types'
+import type { DibuangRincian, HitungResult, Maks, PromoApi } from '../types'
+
+// Pindahan dari Step3Pratinjau yang dihapus 2 Sep 2026 — pratinjau isi pesan sudah
+// ada di langkah 1, tapi rincian tamu yang dilewati tetap harus terbaca sebelum kirim.
+const LABEL_DIBUANG: { kunci: keyof DibuangRincian; teks: string }[] = [
+  { kunci: 'sudah_optout', teks: 'sudah minta berhenti' },
+  { kunci: 'nomor_mati', teks: 'nomornya tidak aktif' },
+  { kunci: 'nomor_rusak', teks: 'format nomornya rusak' },
+  { kunci: 'baru_dikirimi', teks: 'baru saja dikirimi' },
+  { kunci: 'gagal_berulang', teks: 'gagal berulang kali' },
+  { kunci: 'tak_pernah_buka', teks: 'tidak pernah membuka' },
+  { kunci: 'duplikat', teks: 'nomor kembar' },
+]
 
 const angka = (n: number) => new Intl.NumberFormat('id-ID').format(n)
 
@@ -31,6 +43,8 @@ export default function Step4Kirim({
   // sebagai bukti sudah membaca perkiraan biayanya sebelum kirim ke semua tamu.
   const biayaJuta = biaya !== null ? Math.floor(biaya / 1_000_000) : null
 
+  const rincianDibuang = LABEL_DIBUANG.filter((l) => hasil.dibuang[l.kunci] > 0)
+
   const [sudahYakin, setSudahYakin] = useState(false) // dipakai kalau biaya tidak diketahui
   const [inputJuta, setInputJuta] = useState('')
 
@@ -43,6 +57,12 @@ export default function Step4Kirim({
       <button onClick={onBack} disabled={busy} className="btn-ghost mb-4">
         ← Kembali
       </button>
+
+      {hasil.peringatan && (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800">{hasil.peringatan}</p>
+        </div>
+      )}
 
       <div className="card p-5 text-center">
         <p className="text-base text-slate-700">
@@ -63,6 +83,22 @@ export default function Step4Kirim({
           </p>
         )}
       </div>
+
+      {!modeUji && rincianDibuang.length > 0 && (
+        <div className="card mt-4 p-4">
+          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Tamu yang dilewati
+          </p>
+          <ul className="space-y-1">
+            {rincianDibuang.map((l) => (
+              <li key={l.kunci} className="flex items-center justify-between text-sm">
+                <span className="text-slate-500">{l.teks}</span>
+                <span className="font-semibold text-slate-700">{angka(hasil.dibuang[l.kunci])}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {error && (
         <div className="mt-4 rounded-xl bg-red-50 px-4 py-3">

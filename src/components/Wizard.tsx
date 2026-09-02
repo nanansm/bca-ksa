@@ -3,12 +3,14 @@ import { api, ApiError } from '../lib/api'
 import StepIndicator from './StepIndicator'
 import Step1Promo from './Step1Promo'
 import Step2Jumlah from './Step2Jumlah'
-import Step3Pratinjau from './Step3Pratinjau'
 import Step4Kirim from './Step4Kirim'
 import Step5Progres from './Step5Progres'
 import type { HitungResult, Maks, Progres, PromoApi, ResponPengaturan } from '../types'
 
-type Langkah = 1 | 2 | 3 | 4 | 5
+// Langkah 3 (pratinjau pesan) dihapus 2 Sep 2026: isi pesan sudah bisa dibaca di
+// langkah 1 saat memilih promo, jadi layar itu cuma mengulang. Langkah 4 (kirim)
+// naik jadi 3, layar progres tetap 5.
+type Langkah = 1 | 2 | 3 | 5
 
 // Status run yang masih dianggap "sedang berjalan" — dipakai buat menentukan
 // kapan polling progres boleh berhenti.
@@ -186,25 +188,14 @@ export default function Wizard({ onSesiHabis }: { onSesiHabis: () => void }) {
         />
       )}
 
-      {langkah === 3 && promo && hasil && (
-        <Step3Pratinjau
-          promo={promo}
-          hasil={hasil}
-          maks={maks ?? 25}
-          tarifPerPesan={pengaturan?.tarif_per_pesan ?? null}
-          onLanjut={() => setLangkah(4)}
-          onBack={() => setLangkah(2)}
-        />
-      )}
-
-      {langkah === 4 && promo && hasil && maks !== null && (
+      {langkah === 3 && promo && hasil && maks !== null && (
         <Step4Kirim
           promo={promo}
           maks={maks}
           hasil={hasil}
           tarifPerPesan={pengaturan?.tarif_per_pesan ?? null}
           onKonfirmasi={kirimSekarang}
-          onBack={() => setLangkah(3)}
+          onBack={() => setLangkah(2)}
           busy={busyKirim}
           error={kirimError}
         />

@@ -1,6 +1,6 @@
 import { json } from '../_lib/auth'
 import { ambilRunTerakhir, hitungTerpakai24Jam, terkirimSejak, type Env } from '../_lib/db'
-import { analitikHarian, kesehatanNomor, type AnalitikHarian } from '../_lib/meta'
+import { analitikHarian, biayaHarian, kesehatanNomor, type AnalitikHarian } from '../_lib/meta'
 import { bacaPengaturan } from '../_lib/pengaturan'
 import { ringkasanRentang } from '../_lib/pesan'
 
@@ -21,7 +21,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   const mulai30Hari = new Date(sekarang.getTime() - 30 * 24 * 60 * 60 * 1000)
   const awalBulan = awalBulanJakarta(sekarang)
 
-  const [pengaturan, terpakai24j, nomorHasil, analitikHasil, ringkasBulan, runTerakhir, terkirimBcBulanIni] =
+  const [pengaturan, terpakai24j, nomorHasil, analitikHasil, ringkasBulan, runTerakhir, terkirimBcBulanIni, biayaHasil] =
     await Promise.all([
     bacaPengaturan(env),
     hitungTerpakai24Jam(env),
@@ -30,12 +30,23 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
     ringkasanRentang(env, awalBulan.toISOString(), sekarang.toISOString()),
     ambilRunTerakhir(env, JUMLAH_RUN_TERAKHIR),
     terkirimSejak(env, awalBulan.toISOString()),
+    biayaHarian(env, mulai30Hari, sekarang),
   ])
 
   const gagal: string[] = []
 
   const harian: AnalitikHarian[] = analitikHasil.ok ? analitikHasil.data : []
   if (!analitikHasil.ok) gagal.push(`harian: ${analitikHasil.sebab}`)
+
+  // Biaya sebenarnya dari Meta. Kalau Meta gagal dijawab, jatuh balik ke tarif x jumlah
+  // supaya kartu biaya tidak kosong -- layar diberi tahu mana yang sedang dipakai.
+  const tanggalAwalBulan = awalBulan.toISOString().slice(0, 10)
+  const biayaAsli = biayaHasil.ok
+    ? biayaHasil.data
+        .filter((b) => b.tanggal >= tanggalAwalBulan)
+        .reduce((total, b) => total + b.biaya, 0)
+    : null
+  if (!biayaHasil.ok) gagal.push(`biaya: ${biayaHasil.sebab}`)
 
   const nomor = nomorHasil.ok
     ? { display: nomorHasil.data.display, kualitas: nomorHasil.data.kualitas, status: nomorHasil.data.status }
@@ -57,7 +68,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
       terkirim: terkirimBcBulanIni,
       sampai: ringkasBulan === null ? null : ringkasBulan.sampai,
       dibaca: ringkasBulan === null ? null : ringkasBulan.dibaca,
-      perkiraan_biaya: terkirimBcBulanIni * pengaturan.tarifPerPesan,
+      // `biaya_asli` true berarti angkanya tagihan Meta yang sebenarnya, bukan hitungan
+      // tarif x jumlah. Layar wajib mengubah labelnya sesuai penanda ini.
+      biaya: biayaAsli === null ? terkirimBcBulanIni * pengaturan.tarifPerPesan : Math.round(biayaAsli),
+      biaya_asli: biayaAsli !== null,
     },
     harian,
     run_terakhir: runTerakhir,

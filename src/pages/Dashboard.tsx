@@ -260,9 +260,9 @@ export default function Dashboard({ onSesiHabis }: { onSesiHabis: () => void }) 
           sub={d.bulan_ini.dibaca === null ? 'pelacakan baru mulai berjalan' : 'pesan promo'}
         />
         <Kartu
-          judul="Perkiraan biaya"
-          nilai={rupiah(d.bulan_ini.perkiraan_biaya)}
-          sub="perkiraan, bukan tagihan pasti"
+          judul={d.bulan_ini.biaya_asli ? 'Tagihan Meta bulan ini' : 'Perkiraan biaya'}
+          nilai={rupiah(d.bulan_ini.biaya)}
+          sub={d.bulan_ini.biaya_asli ? 'angka asli dari WhatsApp' : 'perkiraan, bukan tagihan pasti'}
         />
       </div>
 

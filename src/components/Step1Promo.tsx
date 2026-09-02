@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '../lib/api'
+import WhatsappBubble from './WhatsappBubble'
 import type { PromoApi } from '../types'
 
 type Muatan =
@@ -98,42 +99,19 @@ function PreviewPesan({ promo }: { promo: PromoApi }) {
     <div className="mt-3 border-t border-slate-100 pt-3">
       <p className="mb-2 text-xs font-semibold text-slate-500">Yang tamu terima di WhatsApp</p>
 
-      {/* Gelembung pesan, meniru tampilan WhatsApp supaya staf tidak perlu
-          membayangkan hasil akhirnya. */}
-      <div className="rounded-2xl rounded-tl-sm bg-[#F7F6F2] p-3">
-        {promo.gambar_url && (
-          <img
-            src={promo.gambar_url}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            className="mb-2 w-full rounded-lg bg-slate-100 object-cover"
-          />
-        )}
-        {promo.butuh_gambar && !promo.gambar_url && (
-          <p className="mb-2 rounded-lg bg-white px-3 py-2 text-xs text-slate-500">
-            Promo ini pakai gambar. Gambarnya diupload nanti di langkah berikutnya.
-          </p>
-        )}
-
-        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-800">
-          {promo.isi_pesan}
+      {promo.butuh_gambar && !promo.gambar_url && (
+        <p className="mb-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+          Promo ini pakai gambar. Gambarnya diupload nanti di langkah berikutnya.
         </p>
+      )}
 
-        {promo.footer && <p className="mt-2 text-[11px] text-slate-400">{promo.footer}</p>}
-
-        {promo.tombol.length > 0 && (
-          <div className="mt-2 space-y-1">
-            {promo.tombol.map((t) => (
-              <div
-                key={t.teks}
-                className="rounded-lg bg-white py-2 text-center text-sm font-medium text-[#1a3a2a]"
-              >
-                {t.teks}
-              </div>
-            ))}
-          </div>
-        )}
+      <div className="rounded-2xl bg-[#0b141a] p-3">
+        <WhatsappBubble
+          isiPesan={promo.isi_pesan}
+          footer={promo.footer}
+          gambarUrl={promo.gambar_url}
+          tombol={promo.tombol}
+        />
       </div>
 
       {promo.tombol.length === 0 && (

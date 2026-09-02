@@ -1,6 +1,6 @@
-const LANGKAH = [1, 2, 3, 4] as const
+const LANGKAH = [1, 2, 3] as const
 
-export default function StepIndicator({ langkahAktif }: { langkahAktif: 1 | 2 | 3 | 4 }) {
+export default function StepIndicator({ langkahAktif }: { langkahAktif: 1 | 2 | 3 }) {
   return (
     <ol className="mb-5 flex items-center gap-2">
       {LANGKAH.map((n, i) => {

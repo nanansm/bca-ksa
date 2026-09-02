@@ -96,6 +96,46 @@ export async function analitikHarian(env: Env, mulai: Date, selesai: Date): Prom
   })
 }
 
+interface ResponPricing {
+  pricing_analytics?: {
+    data?: { data_points?: { start: number; volume?: number; cost?: number }[] }[]
+  }
+}
+
+export interface BiayaHarian {
+  tanggal: string // 'YYYY-MM-DD'
+  jumlah: number // pesan berbayar
+  biaya: number // rupiah, sudah dijumlah semua kategori harga hari itu
+}
+
+/**
+ * GET /{WABA}?fields=pricing_analytics... — biaya SEBENARNYA yang ditagih Meta, bukan
+ * perkiraan tarif x jumlah. Angka ini yang sama dengan "Approximate charges" di
+ * WhatsApp Manager. Satu hari bisa punya beberapa data point (kategori harga berbeda),
+ * jadi dijumlahkan per tanggal.
+ */
+export async function biayaHarian(env: Env, mulai: Date, selesai: Date): Promise<HasilMeta<BiayaHarian[]>> {
+  const kunci = `biaya:${mulai.toISOString().slice(0, 10)}:${selesai.toISOString().slice(0, 10)}`
+  return ambilTercache(env, kunci, async () => {
+    const fields =
+      `pricing_analytics.start(${epochDetik(mulai)}).end(${epochDetik(selesai)})` +
+      `.granularity(DAILY).dimensions(['PRICING_CATEGORY'])`
+    const data = await panggilGraph<ResponPricing>(env, env.META_WABA_ID, fields)
+
+    const perTanggal = new Map<string, BiayaHarian>()
+    for (const kelompok of data.pricing_analytics?.data ?? []) {
+      for (const t of kelompok.data_points ?? []) {
+        const tanggal = new Date((t.start + JAKARTA_OFFSET_DETIK) * 1000).toISOString().slice(0, 10)
+        const ada = perTanggal.get(tanggal) ?? { tanggal, jumlah: 0, biaya: 0 }
+        ada.jumlah += t.volume ?? 0
+        ada.biaya += t.cost ?? 0
+        perTanggal.set(tanggal, ada)
+      }
+    }
+    return [...perTanggal.values()].sort((a, b) => a.tanggal.localeCompare(b.tanggal))
+  })
+}
+
 interface ResponNomor {
   display_phone_number: string
   quality_rating: string
