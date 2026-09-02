@@ -4,7 +4,9 @@ import type { Env } from './auth'
 const KUNCI_TARIF = 'set:tarif_per_pesan'
 const KUNCI_BATAS = 'set:batas_harian'
 
-const AWAL_TARIF = 500
+// Rp 586 = tarif marketing Indonesia yang benar-benar ditagih Meta ke KSA, dibaca dari
+// pricing_analytics 30 hari terakhir (563.946,27 untuk 1.233 pesan). Bukan angka karangan.
+const AWAL_TARIF = 586
 const AWAL_BATAS = 1000
 
 export interface Pengaturan {
