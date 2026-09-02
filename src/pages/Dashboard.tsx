@@ -237,7 +237,7 @@ export default function Dashboard({ onSesiHabis }: { onSesiHabis: () => void }) 
   const d = muatan.data
   // Backend menandai sendiri bagian mana yang gagal diambil dari Meta lewat `gagal`.
   // Bagian lain dashboard tetap tampil seperti biasa, jangan bikin halaman kosong.
-  const nomorGagal = (d.gagal ?? []).includes('nomor')
+  const nomorGagal = (d.gagal ?? []).some((g) => g.startsWith('nomor'))
   const kes = bacaKualitas(d.nomor.kualitas)
 
   return (

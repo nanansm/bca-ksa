@@ -12,7 +12,7 @@ const CACHE_TTL_DETIK = 10 * 60
 const CACHE_PREFIX = 'cache:meta:'
 const JAKARTA_OFFSET_DETIK = 7 * 60 * 60
 
-export type HasilMeta<T> = { ok: true; data: T } | { ok: false }
+export type HasilMeta<T> = { ok: true; data: T } | { ok: false; sebab: string }
 
 export interface AnalitikHarian {
   tanggal: string // 'YYYY-MM-DD'
@@ -46,18 +46,27 @@ async function ambilTercache<T>(env: Env, kunci: string, ambil: () => Promise<T>
     const data = await ambil()
     await env.BC_STATE.put(kunciCache, JSON.stringify(data), { expirationTtl: CACHE_TTL_DETIK })
     return { ok: true, data }
-  } catch {
-    return { ok: false }
+  } catch (e) {
+    // Sebab dibawa keluar supaya dashboard bisa bilang APA yang gagal, bukan cuma
+    // "tidak bisa diambil". Pesannya tidak pernah memuat token -- lihat panggilGraph.
+    return { ok: false, sebab: e instanceof Error ? e.message : 'gagal tanpa keterangan' }
   }
 }
 
 async function panggilGraph<T>(env: Env, id: string, fields: string): Promise<T> {
+  if (!env.META_TOKEN) throw new Error('META_TOKEN belum dipasang di Pages')
+  if (!id) throw new Error('id Meta kosong (META_WABA_ID / META_PHONE_ID belum dipasang)')
+
   const url = new URL(`https://graph.facebook.com/${VERSI}/${id}`)
   url.searchParams.set('fields', fields)
   url.searchParams.set('access_token', env.META_TOKEN)
 
   const res = await fetch(url.toString(), { signal: AbortSignal.timeout(15_000) })
-  if (!res.ok) throw new Error(`Meta ${id} balas ${res.status}`)
+  if (!res.ok) {
+    // Badan balasan Meta memuat kode & pesan errornya, tidak memuat token.
+    const badan = await res.text().catch(() => '')
+    throw new Error(`Meta balas ${res.status}: ${badan.slice(0, 200)}`)
+  }
   return (await res.json()) as T
 }
 

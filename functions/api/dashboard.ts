@@ -35,12 +35,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   const gagal: string[] = []
 
   const harian: AnalitikHarian[] = analitikHasil.ok ? analitikHasil.data : []
-  if (!analitikHasil.ok) gagal.push('harian')
+  if (!analitikHasil.ok) gagal.push(`harian: ${analitikHasil.sebab}`)
 
   const nomor = nomorHasil.ok
     ? { display: nomorHasil.data.display, kualitas: nomorHasil.data.kualitas, status: nomorHasil.data.status }
     : { display: '', kualitas: 'tidak diketahui', status: 'tidak diketahui' }
-  if (!nomorHasil.ok) gagal.push('nomor')
+  if (!nomorHasil.ok) gagal.push(`nomor: ${nomorHasil.sebab}`)
 
   return json({
     ok: true,
