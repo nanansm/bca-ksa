@@ -295,20 +295,30 @@ export default function BuatPromo({ onSesiHabis }: { onSesiHabis: () => void }) 
             </div>
 
             {form.tombolTipe === 'situs' && (
-              <input
-                value={form.tombolUrl}
-                onChange={(e) => ubah('tombolUrl', e.target.value)}
-                placeholder="https://motekreatif.com/promo"
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-brand-400 focus:bg-white"
-              />
+              <>
+                <label htmlFor="tombolUrl" className="mb-1.5 mt-3 block text-sm font-medium text-slate-700">
+                  Link yang dibuka tombol
+                </label>
+                <input
+                  id="tombolUrl"
+                  value={form.tombolUrl}
+                  onChange={(e) => ubah('tombolUrl', e.target.value)}
+                  placeholder="https://motekreatif.com/promo"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-brand-400 focus:bg-white"
+                />
+              </>
             )}
 
+            <label htmlFor="tombolTeks" className="mb-1.5 mt-3 block text-sm font-medium text-slate-700">
+              Tulisan di tombol
+            </label>
             <input
+              id="tombolTeks"
               value={form.tombolTeks}
               onChange={(e) => ubah('tombolTeks', e.target.value)}
               maxLength={25}
               placeholder={form.tombolTipe === 'situs' ? 'Lihat Promo' : 'Saya Mau Tanya'}
-              className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-brand-400 focus:bg-white"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-brand-400 focus:bg-white"
             />
             <p className="mt-1 text-xs text-slate-400">Tulisan yang tamu lihat di tombolnya, maksimal 25 huruf.</p>
           </div>
