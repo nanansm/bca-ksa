@@ -119,7 +119,9 @@ hanya `siap = 1`, terbaru dulu.
 `functions/api/_middleware.ts`. Balas `{ok:true, nama, nomor:[{nomor, nama}]}` — n8n
 memakai nama tamunya untuk menulis baris baru di sheet `BC - Audience`.
 Ambil semua baris, tanpa paginasi — 12 ribu nomor ±480 KB, masih aman.
-Parameter `id` TIDAK ADA di query → `{ok:true, nama:'', nomor:[]}` status 200, BUKAN 404:
+Parameter `id` KOSONG atau tidak ada → `{ok:true, nama:'', nomor:[]}` status 200, BUKAN 404.
+Diperiksa lewat NILAI, bukan `searchParams.has()` — ekspresi n8n menghasilkan `?id=`
+(parameternya ada, isinya kosong) dan `has()` membaca itu sebagai ada. Alasannya:
 node n8n memanggil endpoint ini tanpa cabang IF, jadi broadcast "semua tamu" tetap
 memanggilnya dengan id kosong dan harus menerima daftar kosong.
 `id` ada tapi tidak ketemu → 404 `{error:'Daftar tidak ditemukan.'}`.
