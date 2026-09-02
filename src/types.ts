@@ -142,3 +142,20 @@ export interface DashboardApi {
   /** Bagian yang gagal diambil dari Meta ('nomor' / 'harian'). Absen kalau semua beres. */
   gagal?: string[]
 }
+
+/** Satu baris di GET /api/daftar -- cuma yang `siap = 1`, lihat KONTRAK-DAFTAR-TAMU.md. */
+export interface DaftarApi {
+  id: string
+  nama: string
+  periode: string
+  checkout_terakhir: string | null
+  jumlah: number
+  dibuat: string
+}
+
+/** Isian layar Daftar Tamu untuk POST /api/daftar `{aksi:'mulai'}`. */
+export interface DaftarMulaiBody {
+  nama: string
+  periode: string
+  checkout_terakhir: string
+}

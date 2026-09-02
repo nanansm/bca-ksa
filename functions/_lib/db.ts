@@ -275,3 +275,110 @@ export async function terkirimSejak(env: Env, mulaiIso: string): Promise<number>
     .first<{ n: number }>()
   return baris?.n ?? 0
 }
+
+export interface DaftarRingkas {
+  id: string
+  nama: string
+  periode: string
+  checkout_terakhir: string | null
+  jumlah: number
+  dibuat: string
+}
+
+/** Bikin baris daftar baru, `siap = 0` sampai unggahan selesai (lihat KONTRAK-DAFTAR-TAMU.md). */
+export async function buatDaftar(
+  env: Env,
+  data: { id: string; nama: string; periode: string; checkoutTerakhir: string | null },
+): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO daftar (id, nama, periode, checkout_terakhir, jumlah, siap, dibuat) VALUES (?, ?, ?, ?, 0, 0, ?)`,
+  )
+    .bind(data.id, data.nama, data.periode, data.checkoutTerakhir, new Date().toISOString())
+    .run()
+}
+
+/** Cuma kolom yang dibutuhkan buat memeriksa kunci sebelum menambah nomor. */
+export async function ambilStatusDaftar(env: Env, id: string): Promise<{ siap: number } | null> {
+  return await env.DB.prepare('SELECT siap FROM daftar WHERE id = ?').bind(id).first<{ siap: number }>()
+}
+
+/**
+ * Tulis satu potongan nomor. Dipecah maksimal 25 baris per pernyataan (75 parameter,
+ * di bawah batas 100 D1) dan maksimal 20 pernyataan per `env.DB.batch()` -- lihat
+ * KONTRAK-DAFTAR-TAMU.md.
+ */
+export async function tambahNomorDaftar(
+  env: Env,
+  daftarId: string,
+  nomor: { nomor: string; nama: string }[],
+): Promise<void> {
+  const BARIS_PER_PERNYATAAN = 25
+  const PERNYATAAN_PER_BATCH = 20
+
+  const pernyataan: D1PreparedStatement[] = []
+  for (let i = 0; i < nomor.length; i += BARIS_PER_PERNYATAAN) {
+    const potongan = nomor.slice(i, i + BARIS_PER_PERNYATAAN)
+    const placeholder = potongan.map(() => '(?,?,?)').join(',')
+    const nilai = potongan.flatMap((n) => [daftarId, n.nomor, n.nama])
+    pernyataan.push(
+      env.DB.prepare(`INSERT OR IGNORE INTO daftar_nomor (daftar_id, nomor, nama) VALUES ${placeholder}`).bind(
+        ...nilai,
+      ),
+    )
+  }
+
+  for (let i = 0; i < pernyataan.length; i += PERNYATAAN_PER_BATCH) {
+    await env.DB.batch(pernyataan.slice(i, i + PERNYATAAN_PER_BATCH))
+  }
+}
+
+/**
+ * Mengunci daftar: `siap` cuma ditulis 1 lewat pernyataan ini (persis kontrak), lalu
+ * jumlah sungguhan diperiksa terpisah -- kalau 0, baris yang baru saja dikunci dihapus
+ * lagi supaya daftar kosong tidak pernah muncul sebagai pilihan penerima.
+ */
+export async function selesaikanDaftar(env: Env, id: string): Promise<number> {
+  await env.DB.prepare(
+    `UPDATE daftar SET jumlah = (SELECT COUNT(*) FROM daftar_nomor WHERE daftar_id = ?), siap = 1 WHERE id = ?`,
+  )
+    .bind(id, id)
+    .run()
+
+  const baris = await env.DB.prepare('SELECT jumlah FROM daftar WHERE id = ?').bind(id).first<{ jumlah: number }>()
+  const jumlah = baris?.jumlah ?? 0
+  if (jumlah === 0) await hapusDaftar(env, id)
+  return jumlah
+}
+
+/** Daftar yang siap dipakai (`siap = 1`), terbaru dulu -- buat pemilih penerima Kirim Promo. */
+export async function ambilDaftarSiap(env: Env): Promise<DaftarRingkas[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT id, nama, periode, checkout_terakhir, jumlah, dibuat FROM daftar WHERE siap = 1 ORDER BY dibuat DESC`,
+  ).all<DaftarRingkas>()
+  return results ?? []
+}
+
+export async function hapusDaftar(env: Env, id: string): Promise<void> {
+  await env.DB.batch([
+    env.DB.prepare('DELETE FROM daftar_nomor WHERE daftar_id = ?').bind(id),
+    env.DB.prepare('DELETE FROM daftar WHERE id = ?').bind(id),
+  ])
+}
+
+export interface DaftarNomorHasil {
+  nama: string
+  nomor: { nomor: string; nama: string }[]
+}
+
+/** Nama daftar + seluruh nomornya, dipakai MESIN (n8n) lewat X-BC-Secret. `null` = tidak ketemu. */
+export async function ambilNomorDaftar(env: Env, id: string): Promise<DaftarNomorHasil | null> {
+  const daftar = await env.DB.prepare('SELECT nama FROM daftar WHERE id = ? AND siap = 1')
+    .bind(id)
+    .first<{ nama: string }>()
+  if (!daftar) return null
+
+  const { results } = await env.DB.prepare('SELECT nomor, nama FROM daftar_nomor WHERE daftar_id = ?')
+    .bind(id)
+    .all<{ nomor: string; nama: string }>()
+  return { nama: daftar.nama, nomor: results ?? [] }
+}

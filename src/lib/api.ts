@@ -1,4 +1,6 @@
 import type {
+  DaftarApi,
+  DaftarMulaiBody,
   DashboardApi,
   HitungResult,
   Maks,
@@ -51,20 +53,20 @@ export const api = {
   logout: () => request<{ ok: true }>('/api/logout', { method: 'POST' }),
   promos: () => request<{ ok: true; promos: PromoApi[] }>('/api/promos'),
   pengaturan: () => request<ResponPengaturan>('/api/pengaturan'),
-  hitung: (template: string, label: string, maks: Maks) =>
+  hitung: (template: string, label: string, maks: Maks, daftarId: string) =>
     request<HitungResult>('/api/hitung', {
       method: 'POST',
-      body: JSON.stringify({ template, label, maks }),
+      body: JSON.stringify({ template, label, maks, daftar_id: daftarId }),
     }),
   /**
    * Kalau server balas 409 (sudah ada run jalan), error yang dilempar membawa
    * `data.run` (bentuk `Progres`) — pemanggil boleh langsung lompat ke layar
    * progres pakai itu tanpa nge-hit /api/run-aktif lagi.
    */
-  kirim: (template: string, label: string, maks: Maks) =>
+  kirim: (template: string, label: string, maks: Maks, daftarId: string) =>
     request<ResponKirim>('/api/kirim', {
       method: 'POST',
-      body: JSON.stringify({ template, label, maks, konfirmasi: true }),
+      body: JSON.stringify({ template, label, maks, daftar_id: daftarId, konfirmasi: true }),
     }),
   progress: (runId: string) => request<Progres>(`/api/progress?run=${encodeURIComponent(runId)}`),
   runAktif: () => request<{ ok: true; run: Progres | null }>('/api/run-aktif'),
@@ -72,4 +74,12 @@ export const api = {
   promoBaruList: () => request<{ ok: true; promos: PromoBaruApi[] }>('/api/promo-baru'),
   promoBaru: (data: PermintaanPromoBaru) =>
     request<ResponPromoBaru>('/api/promo-baru', { method: 'POST', body: JSON.stringify(data) }),
+  daftarList: () => request<{ ok: true; daftar: DaftarApi[] }>('/api/daftar'),
+  daftarMulai: (data: DaftarMulaiBody) =>
+    request<{ ok: true; id: string }>('/api/daftar', { method: 'POST', body: JSON.stringify({ aksi: 'mulai', ...data }) }),
+  daftarTambah: (id: string, nomor: { nomor: string; nama: string }[]) =>
+    request<{ ok: true }>('/api/daftar', { method: 'POST', body: JSON.stringify({ aksi: 'tambah', id, nomor }) }),
+  daftarSelesai: (id: string) =>
+    request<{ ok: true; jumlah: number }>('/api/daftar', { method: 'POST', body: JSON.stringify({ aksi: 'selesai', id }) }),
+  daftarHapus: (id: string) => request<{ ok: true }>(`/api/daftar?id=${encodeURIComponent(id)}`, { method: 'DELETE' }),
 }

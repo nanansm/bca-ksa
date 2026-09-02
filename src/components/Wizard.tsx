@@ -25,6 +25,9 @@ export default function Wizard({ onSesiHabis }: { onSesiHabis: () => void }) {
   const [promo, setPromo] = useState<PromoApi | null>(null)
   const [maks, setMaks] = useState<Maks | null>(null)
   const [hasil, setHasil] = useState<HitungResult | null>(null)
+  // '' = semua tamu. Dipilih di Step2Jumlah, dibawa sampai ke api.kirim() di sini --
+  // lihat KONTRAK-DAFTAR-TAMU.md.
+  const [daftarId, setDaftarId] = useState('')
 
   const [runId, setRunId] = useState<string | null>(null)
   const [progres, setProgres] = useState<Progres | null>(null)
@@ -99,7 +102,7 @@ export default function Wizard({ onSesiHabis }: { onSesiHabis: () => void }) {
     setBusyKirim(true)
     setKirimError('')
     try {
-      const res = await api.kirim(promo.template, promo.nama, maks)
+      const res = await api.kirim(promo.template, promo.nama, maks, daftarId)
       setRunId(res.runId)
       setProgres(res)
       setLangkah(5)
@@ -148,6 +151,7 @@ export default function Wizard({ onSesiHabis }: { onSesiHabis: () => void }) {
     setPromo(null)
     setMaks(null)
     setHasil(null)
+    setDaftarId('')
     setLangkah(1)
   }
 
@@ -178,9 +182,10 @@ export default function Wizard({ onSesiHabis }: { onSesiHabis: () => void }) {
         <Step2Jumlah
           promo={promo}
           pengaturan={pengaturan}
-          onHitung={(h, m) => {
+          onHitung={(h, m, d) => {
             setHasil(h)
             setMaks(m)
+            setDaftarId(d)
             setLangkah(3)
           }}
           onBack={() => setLangkah(1)}

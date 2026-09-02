@@ -4,6 +4,7 @@ import Login from './components/Login'
 import Dashboard from './pages/Dashboard'
 import KirimPromo from './pages/KirimPromo'
 import BuatPromo from './pages/BuatPromo'
+import DaftarTamu from './pages/DaftarTamu'
 import { api } from './lib/api'
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
       {halaman === 'dashboard' && <Dashboard onSesiHabis={sesiHabis} />}
       {halaman === 'kirim-promo' && <KirimPromo onSesiHabis={sesiHabis} />}
       {halaman === 'buat-promo' && <BuatPromo onSesiHabis={sesiHabis} />}
+      {halaman === 'daftar-tamu' && <DaftarTamu onSesiHabis={sesiHabis} />}
     </Cangkang>
   )
 }

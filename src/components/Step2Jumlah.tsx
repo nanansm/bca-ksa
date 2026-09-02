@@ -1,8 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, ApiError } from '../lib/api'
-import type { HitungResult, Maks, PromoApi, ResponPengaturan } from '../types'
+import type { DaftarApi, HitungResult, Maks, PromoApi, ResponPengaturan } from '../types'
 
 const angka = (n: number) => new Intl.NumberFormat('id-ID').format(n)
+
+// Belum jadi pengaturan (lihat KONTRAK-DAFTAR-TAMU.md) -- kalau nanti perlu diubah
+// staf, pindahkan ke tabel pengaturan seperti tarif & batas harian.
+const JARAK_MIN_HARI = 14
 
 const PILIHAN: { maks: Maks; label: string; keterangan: string }[] = [
   { maks: -1, label: 'Uji dulu', keterangan: '1 pesan ke nomor Mote, tidak ada tamu yang menerima' },
@@ -11,6 +15,19 @@ const PILIHAN: { maks: Maks; label: string; keterangan: string }[] = [
   { maks: 1000, label: '1.000 tamu', keterangan: 'Kirim ke 1.000 tamu pertama yang lolos saring' },
   { maks: 0, label: 'Semua tamu', keterangan: 'Kirim ke seluruh tamu yang lolos saring' },
 ]
+
+function hariIniJakarta(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(new Date())
+}
+
+/** Jumlah hari dari `checkoutIso` (YYYY-MM-DD) sampai hari ini di Asia/Jakarta. */
+function hariSejakCheckout(checkoutIso: string): number {
+  const dari = Date.parse(`${checkoutIso}T00:00:00Z`)
+  const sekarang = Date.parse(`${hariIniJakarta()}T00:00:00Z`)
+  return Math.round((sekarang - dari) / 86_400_000)
+}
+
+type MuatanDaftar = { status: 'memuat' } | { status: 'siap'; data: DaftarApi[] }
 
 export default function Step2Jumlah({
   promo,
@@ -22,25 +39,45 @@ export default function Step2Jumlah({
   promo: PromoApi
   /** Perkiraan tarif & sisa kuota dari /api/pengaturan. `null` kalau gagal dimuat. */
   pengaturan: ResponPengaturan | null
-  onHitung: (hasil: HitungResult, maks: Maks) => void
+  onHitung: (hasil: HitungResult, maks: Maks, daftarId: string) => void
   onBack: () => void
   onSesiHabis: () => void
 }) {
   const [menghitung, setMenghitung] = useState<Maks | null>(null)
   const [error, setError] = useState('')
 
+  const [daftar, setDaftar] = useState<MuatanDaftar>({ status: 'memuat' })
+  const [daftarId, setDaftarId] = useState('') // '' = Semua tamu
+
+  useEffect(() => {
+    api
+      .daftarList()
+      .then((r) => setDaftar({ status: 'siap', data: r.daftar }))
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 401) return onSesiHabis()
+        // Gagal muat daftar bukan alasan buat mengunci Kirim Promo -- perlakukan
+        // sama seperti belum ada daftar tersimpan (pemilih disembunyikan).
+        setDaftar({ status: 'siap', data: [] })
+      })
+    // eslint-disable-next-line
+  }, [])
+
   function pilih(maks: Maks) {
     setError('')
     setMenghitung(maks)
     api
-      .hitung(promo.template, promo.nama, maks)
-      .then((hasil) => onHitung(hasil, maks))
+      .hitung(promo.template, promo.nama, maks, daftarId)
+      .then((hasil) => onHitung(hasil, maks, daftarId))
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) return onSesiHabis()
         setError(err instanceof Error ? err.message : 'Gagal menghitung jumlah penerima.')
         setMenghitung(null)
       })
   }
+
+  const daftarTerpilih = daftar.status === 'siap' ? daftar.data.find((d) => d.id === daftarId) : undefined
+  const hariCheckout = daftarTerpilih?.checkout_terakhir ? hariSejakCheckout(daftarTerpilih.checkout_terakhir) : null
+  const perluPeringatan = hariCheckout !== null && hariCheckout < JARAK_MIN_HARI
 
   return (
     <div>
@@ -59,6 +96,34 @@ export default function Step2Jumlah({
         </p>
       )}
       {!pengaturan && <div className="mb-4" />}
+
+      {menghitung === null && daftar.status === 'siap' && daftar.data.length > 0 && (
+        <div className="card mb-4 p-4">
+          <label htmlFor="penerima" className="mb-1.5 block text-sm font-medium text-slate-700">
+            Kirim ke
+          </label>
+          <select
+            id="penerima"
+            value={daftarId}
+            onChange={(e) => setDaftarId(e.target.value)}
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:border-brand-400 focus:bg-white"
+          >
+            <option value="">Semua tamu</option>
+            {daftar.data.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.nama} ({angka(d.jumlah)} nomor)
+              </option>
+            ))}
+          </select>
+
+          {perluPeringatan && (
+            <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              Tamu di daftar ini baru check-out {Math.max(0, hariCheckout ?? 0)} hari lalu. Mote menyarankan
+              menunggu sampai {JARAK_MIN_HARI} hari supaya promonya tidak terasa mengganggu.
+            </p>
+          )}
+        </div>
+      )}
 
       {menghitung !== null && (
         <div className="card mb-4 flex flex-col items-center gap-3 p-6 text-center">
